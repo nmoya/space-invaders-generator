@@ -38,6 +38,22 @@ class InvaderBody:
         self.half_x = math.ceil(size_x / 2)
         self.body = [[0 for _ in range(size_x)] for _ in range(size_y)]
 
+    def __iter__(self):
+        for y, row in enumerate(self.body):
+            for x, value in enumerate(row):
+                yield (x, y, value)
+
+    def set_cell(self, x: int, y: int, value: int):
+        if not (0 <= x < self.size_x and 0 <= y < self.size_y):
+            raise IndexError("Coordinates out of bounds")
+
+        self.body[y][x] = value
+
+    def get_cell(self, x: int, y: int) -> int:
+        if not (0 <= x < self.size_x and 0 <= y < self.size_y):
+            raise IndexError("Coordinates out of bounds")
+        return self.body[y][x]
+
     def adj_8(self, x: int, y: int):
         neighbors = []
         for dy in [-1, 0, 1]:
@@ -50,11 +66,9 @@ class InvaderBody:
         return neighbors
 
     def mirror(self):
-        size_x = len(self.body[0])
-        size_y = len(self.body)
-        for y in range(size_y):
+        for y in range(self.size_y):
             for x in range(self.half_x):
-                self.body[y][size_x - x - 1] = self.body[y][x]
+                self.set_cell(self.size_x - x - 1, y, self.get_cell(x, y))
 
     def fill_around_point(self, x: int, y: int, value: int, depth: int):
         queue = Queue()
@@ -66,7 +80,7 @@ class InvaderBody:
             current_y, current_x = queue.dequeue()
             for ny, nx in self.adj_8(current_x, current_y):
                 if (ny, nx) not in visited:
-                    self.body[ny][nx] = value
+                    self.set_cell(nx, ny, value)
                     visited.add((ny, nx))
                     queue.enqueue((ny, nx))
             depth -= 1
@@ -75,7 +89,7 @@ class InvaderBody:
         pos_x = eye_x + 1
         pos_y = eye_y
         for x in range(pos_x, self.half_x):
-            self.body[pos_y][x] = 1
+            self.set_cell(x, pos_y, 1)
 
     def randomize(self, eye_x: int, eye_y: int):
         max_dist = max(self.half_x, self.size_y)
@@ -91,13 +105,13 @@ class InvaderBody:
             current_y, current_x = queue.dequeue()
             if current_x > self.half_x - 1:
                 continue
-            if self.body[current_y][current_x] == 0:
+            if self.get_cell(current_x, current_y) == 0:
                 distance = abs(current_y - eye_y) + abs(current_x - eye_x)
                 prob = 1.0 - (distance / max_dist) ** falloff
                 if random.random() < prob:
-                    self.body[current_y][current_x] = 1
+                    self.set_cell(current_x, current_y, 1)
             for ny, nx in self.adj_8(current_x, current_y):
-                if (ny, nx) not in visited and self.body[current_y][current_x] == 1:
+                if (ny, nx) not in visited and self.get_cell(current_x, current_y) == 1:
                     visited.add((ny, nx))
                     queue.enqueue((ny, nx))
 
@@ -136,12 +150,11 @@ class Invader:
 
     def draw_invader(self, scale: int, body_color: tuple = (255, 255, 255), eye_color: tuple = (255, 0, 0)):
         image = Image.new(mode="RGB", size=(self.size_x, self.size_y), color=(0, 0, 0))
-        for y, row in enumerate(self.body.body):
-            for x, value in enumerate(row):
-                if (x, y) == self.left_eye or (x, y) == self.right_eye:
-                    image.putpixel((x, y), eye_color)
-                if value == 1:
-                    image.putpixel((x, y), body_color)
+        for x, y, value in self.body:
+            if (x, y) == self.left_eye or (x, y) == self.right_eye:
+                image.putpixel((x, y), eye_color)
+            if value == 1:
+                image.putpixel((x, y), body_color)
         lg = image.resize((image.size[0] * scale, image.size[1] * scale), resample=Image.NEAREST)
         return lg
 
