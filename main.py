@@ -1,3 +1,4 @@
+import copy
 import math
 import random
 
@@ -31,28 +32,49 @@ class Queue:
         raise ValueError("Queue is empty")
 
 
-class InvaderBody:
+class Matrix:
     def __init__(self, size_x: int, size_y: int):
         self.size_x = size_x
         self.size_y = size_y
-        self.half_x = math.ceil(size_x / 2)
-        self.body = [[0 for _ in range(size_x)] for _ in range(size_y)]
+        self.data = [[0 for _ in range(size_x)] for _ in range(size_y)]
 
     def __iter__(self):
-        for y, row in enumerate(self.body):
-            for x, value in enumerate(row):
-                yield (x, y, value)
+        for y in range(self.size_y):
+            for x in range(self.size_x):
+                yield (x, y, self.data[y][x])
+
+    def __eq__(self, other):
+        if not isinstance(other, Matrix):
+            return False
+        if self.size_x != other.size_x or self.size_y != other.size_y:
+            return False
+        for y in range(self.size_y):
+            for x in range(self.size_x):
+                if self.data[y][x] != other.data[y][x]:
+                    return False
+        return True
+
+
+class InvaderBody:
+    def __init__(self, invader, size_x: int, size_y: int):
+        self.invader = invader
+        self.size_x = size_x
+        self.size_y = size_y
+        self.half_x = math.ceil(size_x / 2)
+        self.matrix = Matrix(size_x, size_y)
+        self.invader.save_body_iteration(self.matrix)
 
     def set_cell(self, x: int, y: int, value: int):
         if not (0 <= x < self.size_x and 0 <= y < self.size_y):
             raise IndexError("Coordinates out of bounds")
 
-        self.body[y][x] = value
+        self.matrix.data[y][x] = value
+        self.invader.save_body_iteration(self.matrix)
 
     def get_cell(self, x: int, y: int) -> int:
         if not (0 <= x < self.size_x and 0 <= y < self.size_y):
             raise IndexError("Coordinates out of bounds")
-        return self.body[y][x]
+        return self.matrix.data[y][x]
 
     def adj_8(self, x: int, y: int):
         neighbors = []
@@ -120,9 +142,16 @@ class Invader:
     def __init__(self, size_x: int, size_y: int):
         self.size_x = size_x
         self.size_y = size_y
+        self.body_iterations = []
         self.left_eye = (0, 0)
         self.right_eye = (0, 0)
-        self.body = InvaderBody(size_x, size_y)
+        self.body = InvaderBody(self, size_x, size_y)
+
+    def save_body_iteration(self, array: Matrix):
+        if len(self.body_iterations) > 0 and array == self.body_iterations[-1]:
+            return
+        deep_copy = copy.deepcopy(array)
+        self.body_iterations.append(deep_copy)
 
     def set_eyes(self):
         min_limit_x = math.floor(self.size_x / 4)
@@ -148,9 +177,9 @@ class Invader:
         self.gen_eyes()
         self.gen_body()
 
-    def draw_invader(self, scale: int, body_color: tuple = (255, 255, 255), eye_color: tuple = (255, 0, 0)):
+    def render(self, matrix: Matrix, scale: int, body_color: tuple = (255, 255, 255), eye_color: tuple = (255, 0, 0)):
         image = Image.new(mode="RGB", size=(self.size_x, self.size_y), color=(0, 0, 0))
-        for x, y, value in self.body:
+        for x, y, value in matrix:
             if (x, y) == self.left_eye or (x, y) == self.right_eye:
                 image.putpixel((x, y), eye_color)
             if value == 1:
@@ -158,22 +187,42 @@ class Invader:
         lg = image.resize((image.size[0] * scale, image.size[1] * scale), resample=Image.NEAREST)
         return lg
 
-    def save(
+    def save_png(
         self,
         filename: str,
         scale: int = 10,
         body_color: tuple = (255, 255, 255),
         eye_color: tuple = (255, 0, 0),
     ):
-        image = self.draw_invader(scale, body_color, eye_color)
+        image = self.render(self.body.matrix, scale, body_color, eye_color)
         image.save(filename)
+
+    def save_gif(
+        self,
+        filename: str,
+        scale: int = 10,
+        body_color: tuple = (255, 255, 255),
+        eye_color: tuple = (255, 0, 0),
+    ):
+        gif_loop_duration_seconds = 3
+        images = [self.render(matrix, scale, body_color, eye_color) for matrix in self.body_iterations]
+        images = images + ([images[-1]] * 10)
+        images[0].save(
+            filename,
+            save_all=True,
+            append_images=images[1:],
+            optimize=False,
+            loop=0,
+            duration=max(gif_loop_duration_seconds / len(images) * 1000, 1 / 48 * 1000),
+        )
 
 
 def gen_batch_invaders(count: int, size_x: int, size_y: int):
     for i in tqdm(range(count)):
         invader = Invader(size_x, size_y)
         invader.gen()
-        invader.save(f"./invaders/invader_{i}.png", scale=100, body_color=(255, 176, 0), eye_color=(225, 225, 225))
+        invader.save_png(f"./invaders/invader_{i}.png", scale=100, body_color=(255, 176, 0), eye_color=(225, 225, 225))
+        invader.save_gif(f"./invaders/invader_{i}.gif", scale=100, body_color=(255, 176, 0), eye_color=(225, 225, 225))
 
 
 if __name__ == "__main__":
@@ -182,4 +231,4 @@ if __name__ == "__main__":
     # invader.save("debug.png", scale=100, body_color=(255, 255, 255), eye_color=(255, 0, 0))
     # save_invader(invader, "debug_large.png", scale=10, body_color=(255, 255, 255), eye_color=(255, 0, 0))
 
-    gen_batch_invaders(50, 7, 7)
+    gen_batch_invaders(50, 12, 12)
