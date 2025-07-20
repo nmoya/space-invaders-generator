@@ -35,6 +35,7 @@ class InvaderBody:
     def __init__(self, size_x: int, size_y: int):
         self.size_x = size_x
         self.size_y = size_y
+        self.half_x = math.ceil(size_x / 2)
         self.body = [[0 for _ in range(size_x)] for _ in range(size_y)]
 
     def adj_8(self, x: int, y: int):
@@ -52,7 +53,7 @@ class InvaderBody:
         size_x = len(self.body[0])
         size_y = len(self.body)
         for y in range(size_y):
-            for x in range(math.floor(size_x / 2)):
+            for x in range(self.half_x):
                 self.body[y][size_x - x - 1] = self.body[y][x]
 
     def fill_around_point(self, x: int, y: int, value: int, depth: int):
@@ -73,8 +74,7 @@ class InvaderBody:
     def fill_eyes_gap(self, eye_x: int, eye_y: int):
         pos_x = eye_x + 1
         pos_y = eye_y
-        max_x = math.ceil(len(self.body[0]) / 2)
-        for x in range(pos_x, max_x):
+        for x in range(pos_x, self.half_x):
             self.body[pos_y][x] = 1
 
     def randomize(self, eye_x: int, eye_y: int):
@@ -89,7 +89,7 @@ class InvaderBody:
 
         while not queue.is_empty():
             current_y, current_x = queue.dequeue()
-            if current_x > math.ceil(self.size_x / 2) - 1:
+            if current_x > self.half_x - 1:
                 continue
             if self.body[current_y][current_x] == 0:
                 if current_y <= eye_y and random.random() < (1 / head_counter):
