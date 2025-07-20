@@ -78,8 +78,8 @@ class InvaderBody:
             self.body[pos_y][x] = 1
 
     def randomize(self, eye_x: int, eye_y: int):
-        head_counter = 4
-        legs_counter = 8
+        max_dist = max(self.half_x, self.size_y)
+        falloff = 0.75
         visited = set()
         queue = Queue()
         for ny, nx in self.adj_8(eye_x, eye_y):
@@ -92,11 +92,9 @@ class InvaderBody:
             if current_x > self.half_x - 1:
                 continue
             if self.body[current_y][current_x] == 0:
-                if current_y <= eye_y and random.random() < (1 / head_counter):
-                    head_counter += 1
-                    self.body[current_y][current_x] = 1
-                elif current_y > eye_y and random.random() < (1 / legs_counter):
-                    legs_counter += 1
+                distance = abs(current_y - eye_y) + abs(current_x - eye_x)
+                prob = 1.0 - (distance / max_dist) ** falloff
+                if random.random() < prob:
                     self.body[current_y][current_x] = 1
             for ny, nx in self.adj_8(current_x, current_y):
                 if (ny, nx) not in visited and self.body[current_y][current_x] == 1:
