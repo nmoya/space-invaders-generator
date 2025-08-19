@@ -1,19 +1,10 @@
+import argparse
 import copy
 import math
 import random
 
 from PIL import Image
 from tqdm import tqdm
-
-invader = [
-    [0, 1, 0, 0, 0, 1, 0],
-    [0, 0, 1, 1, 1, 0, 0],
-    [1, 1, 1, 1, 1, 1, 1],
-    [1, 0, 1, 1, 1, 0, 1],
-    [1, 1, 1, 1, 1, 1, 1],
-    [0, 1, 0, 0, 0, 1, 0],
-    [1, 0, 1, 0, 1, 0, 1],
-]
 
 
 class Queue:
@@ -54,6 +45,11 @@ class Matrix:
                     return False
         return True
 
+    def lower_third(self):
+        for y in range(math.floor(self.size_y / 3) * 2, self.size_y):
+            for x in range(self.size_x):
+                yield (x, y, self.data[y][x])
+
 
 class InvaderBody:
     def __init__(self, invader, size_x: int, size_y: int):
@@ -61,20 +57,21 @@ class InvaderBody:
         self.size_x = size_x
         self.size_y = size_y
         self.half_x = math.ceil(size_x / 2)
-        self.matrix = Matrix(size_x, size_y)
-        self.invader.save_body_iteration(self.matrix)
+        self.matrix_idle = Matrix(size_x, size_y)
+        self.matrix_moving = Matrix(size_x, size_y)
+        self.invader.save_body_iteration(self.matrix_idle)
 
     def set_cell(self, x: int, y: int, value: int):
         if not (0 <= x < self.size_x and 0 <= y < self.size_y):
             raise IndexError("Coordinates out of bounds")
 
-        self.matrix.data[y][x] = value
-        self.invader.save_body_iteration(self.matrix)
+        self.matrix_idle.data[y][x] = value
+        self.invader.save_body_iteration(self.matrix_idle)
 
     def get_cell(self, x: int, y: int) -> int:
         if not (0 <= x < self.size_x and 0 <= y < self.size_y):
             raise IndexError("Coordinates out of bounds")
-        return self.matrix.data[y][x]
+        return self.matrix_idle.data[y][x]
 
     def adj_8(self, x: int, y: int):
         neighbors = []
@@ -137,6 +134,9 @@ class InvaderBody:
                     visited.add((ny, nx))
                     queue.enqueue((ny, nx))
 
+    def gen_movement(self):
+        self.matrix_moving = copy.deepcopy(self.matrix_idle)
+
 
 class Invader:
     def __init__(self, size_x: int, size_y: int):
@@ -172,6 +172,7 @@ class Invader:
     def gen_body(self):
         self.body.randomize(self.left_eye[0], self.left_eye[1])
         self.body.mirror()
+        self.body.gen_movement()
 
     def gen(self):
         self.gen_eyes()
@@ -194,8 +195,8 @@ class Invader:
         body_color: tuple = (255, 255, 255),
         eye_color: tuple = (255, 0, 0),
     ):
-        image = self.render(self.body.matrix, scale, body_color, eye_color)
-        image.save(filename)
+        idle = self.render(self.body.matrix_idle, scale, body_color, eye_color)
+        idle.save(filename)
 
     def save_gif(
         self,
@@ -217,18 +218,42 @@ class Invader:
         )
 
 
-def gen_batch_invaders(count: int, size_x: int, size_y: int):
+def gen_batch_invaders(
+    count: int,
+    size_x: int,
+    size_y: int,
+    scale: int = 10,
+    body_color=(255, 176, 0),
+    eye_color=(225, 225, 225),
+    folder: str = "./invaders_medium_13",
+):
     for i in tqdm(range(count)):
         invader = Invader(size_x, size_y)
         invader.gen()
-        invader.save_png(f"./invaders/invader_{i}.png", scale=100, body_color=(255, 176, 0), eye_color=(225, 225, 225))
-        invader.save_gif(f"./invaders/invader_{i}.gif", scale=100, body_color=(255, 176, 0), eye_color=(225, 225, 225))
+        invader.save_png(f"{folder}/invader_{i}.png", scale=scale, body_color=body_color, eye_color=eye_color)
+        invader.save_gif(f"{folder}/invader_{i}.gif", scale=scale, body_color=body_color, eye_color=eye_color)
 
 
 if __name__ == "__main__":
-    # invader = Invader(7, 7)
-    # invader.gen()
-    # invader.save("debug.png", scale=100, body_color=(255, 255, 255), eye_color=(255, 0, 0))
-    # save_invader(invader, "debug_large.png", scale=10, body_color=(255, 255, 255), eye_color=(255, 0, 0))
+    parser = argparse.ArgumentParser(description="Generate Space Invaders")
+    parser.add_argument("--count", type=int, default=50, help="Number of invaders to generate")
+    parser.add_argument("--size_xy", type=int, default=13, help="Width and height of the invader")
+    parser.add_argument("--scale", type=int, default=10, help="Scale factor for the invader images")
+    parser.add_argument("--body_color", type=str, default="(255, 176, 0)", help="Color of the invader body")
+    parser.add_argument("--eye_color", type=str, default="(225, 225, 225)", help="Color of the invader eyes")
+    parser.add_argument("--folder", type=str, default="./invaders_medium_13", help="Output folder for invaders")
 
-    gen_batch_invaders(50, 12, 12)
+    # debug
+    # args = parser.parse_args(
+    # ["--count", "1", "--size_x", "13", "--size_y", "13", "--scale", "10", "--folder", "./invaders_debug"]
+    # )
+    args = parser.parse_args()
+    gen_batch_invaders(
+        count=args.count,
+        size_x=args.size_xy,
+        size_y=args.size_xy,
+        scale=args.scale,
+        body_color=eval(args.body_color),
+        eye_color=eval(args.eye_color),
+        folder=args.folder,
+    )
